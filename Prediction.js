@@ -7,6 +7,7 @@ import {
     DialogContentText,
     DialogActions, CircularProgress, LinearProgress, Chip, Avatar, Divider, Grid, Card, CardContent, MenuItem
     } from '@mui/material';
+import {Line} from 'react-chartjs-2';
 
 function Prediction(){
     const [formData, setFormData] = useState({
@@ -26,6 +27,8 @@ function Prediction(){
         line_color: ''
       });
 
+      const [predictedPrice, setPredictedPrice] = useState(null);
+      const [chartData, setChartData] = useState(null);
       const [errors, setErrors] = useState({});
 
       const regexPatterns = {
@@ -103,6 +106,8 @@ function Prediction(){
                 });
                 const result = await response.json();
                 console.log(result); // Handle the prediction result as needed
+                setPredictedPrice(result.prediction); // Assume API returns predicted price
+                setChartData(result.chart_data); // Assume API returns chart data
             } catch (error) {
                 console.error('Error:', error);
             }
@@ -169,7 +174,7 @@ function Prediction(){
 
                             <Grid item xs = {12} sm = {6}>
                                 <TextField sx = {{bgcolor: '#dfead9' }} select label="Flat Model" name="flat_model" value={formData.flat_model} onChange={handleChange} fullWidth required>
-                                    {['2-room', 'adjoined flat', 'apartment', 'DBSS', 'improved', 'maisonette', 'model A', 'model A2', 'new generation', 'premium apartment', 'premium apartment loft', 'premium maisonette', 'simplified', 'standard', 'terrace', 'type S1', 'type S2'].map((option) => (
+                                    {['2-room', 'Adjoined flat', 'Apartment', 'DBSS', 'Improved', 'Maisonette', 'Model A', 'Model A2', 'New Generation', 'Premium Apartment', 'Premium Apartment Loft', 'Premium Maisonette', 'Simplified', 'Standard', 'Terrace', 'Type S1', 'Type S2'].map((option) => (
                                         <MenuItem key={option} value={option}>{option}</MenuItem>
                                     ))}
                                 </TextField>
@@ -210,6 +215,18 @@ function Prediction(){
                             
                         </Grid>
                     </form>
+
+                    {predictedPrice !== null && (
+                        <Box sx={{ marginTop: 4 }}>
+                            <Typography variant="h6">Predicted Price: ${predictedPrice}</Typography>
+                            {/* {chartData && (
+                                <Box sx={{ marginTop: 2 }}>
+                                    <Typography variant="h6">Price Trend:</Typography>
+                                    <Line data={chartData} />
+                                </Box>
+                            )} */}
+                        </Box>
+                    )}
                 </CardContent>
             </Card>
         </Grid>
