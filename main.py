@@ -5,7 +5,6 @@ import pickle
 import pandas as pd
 import os
 from datetime import datetime
-from sklearn.preprocessing import StandardScaler
 
 app = FastAPI()
 
@@ -22,17 +21,9 @@ app.add_middleware(
 with open('linear_regression_model.pkl', 'rb') as f:
     model = pickle.load(f)
 
-scaler = StandardScaler()
-
-# # Load test dataset and get predicted prices
-# test_data_X = pd.read_csv('X_test.csv')
-# test_data_y = pd.read_csv('y_test.csv')
-
-# # Combine the features and target variable for predictions
-# test_data = pd.concat([test_data_X, test_data_y], axis=1)
-
-# # Make predictions on the test dataset
-# test_predictions = model.predict(test_data)
+# Uncomment the scaler loading if needed
+with open('scaler.pkl', 'rb') as f:
+    scaler = pickle.load(f)
 
 # Create a directory for saving plots if it doesn't exist
 if not os.path.exists("plots"):
@@ -41,7 +32,7 @@ if not os.path.exists("plots"):
 class HouseData(BaseModel):
     date_listed: str  # Expecting date in 'YYYY-MM-DD' format
     floor_area_sqm: float
-    remaining_lease_month: int
+    remaining_lease_months: int
     floor_area_sqft: float
     price_per_sqft: float
     distance_to_mrt_meters: float
@@ -58,50 +49,43 @@ def preprocess_input(data: dict):
     # Convert 'date_listed' to Unix timestamp
     date_obj = datetime.strptime(data['date_listed'], "%Y-%m-%d")
     data['date_listed'] = int(date_obj.timestamp())
-    
+
     # Convert input data to DataFrame
     df = pd.DataFrame([data])
 
-    # Scale numerical features
+    # Scale numerical features using the scaler
     numerical_columns = [
-        'floor_area_sqm', 'remaining_lease_month', 
-        'floor_area_sqft', 'price_per_sqft', 'distance_to_mrt_meters',
-        'distance_to_cbd', 'distance_to_pri_school_meters'
+        'remaining_lease_months', 'floor_area_sqft', 'price_per_sqft', 
+        'distance_to_mrt_meters', 'distance_to_cbd', 'distance_to_pri_school_meters'
     ]
-    df[numerical_columns] = scaler.transform(df[numerical_columns])
     
-    # Apply one-hot encoding
+    # Scale the numerical features
+    df[numerical_columns] = scaler.transform(df[numerical_columns])
+
+    # One-hot encoding for categorical fields
     df_encoded = pd.get_dummies(df, columns=[
         'flat_type', 'storey_range', 'flat_model', 'region_ura', 'transport_type', 'line_color'
     ])
-    
-    # Align encoded DataFrame with model's training features
+
+    # Align encoded DataFrame with model features
     model_features = model.feature_names_in_
     for col in model_features:
         if col not in df_encoded.columns:
-            df_encoded[col] = 0  # Add missing columns with zeros
-    
+            df_encoded[col] = 0  # Fill missing columns with zeros
+
+    # Ensure correct ordering of features
     return df_encoded[model_features]
 
 @app.post("/predict")
 def predict(house: HouseData):
-    # Prepare the input data for the model
+    # Prepare input data for prediction
     input_data = house.dict()
     processed_data = preprocess_input(input_data)
 
-    # Make the prediction for the user's input
+    # Make prediction
     scaled_prediction = model.predict(processed_data)
 
-    # Unscale the predicted price
-    original_scale_prediction = scaler.inverse_transform(
-        [scaled_prediction]
-    )[0][0]
-
-    # Send both the current prediction and test dataset predictions
-    return {
-        "prediction": original_scale_prediction[0],
-        # "test_predictions": test_predictions.tolist()  # Convert to list for JSON serialization
-    }
+    return {"prediction": scaled_prediction[0]}  # Return first prediction
 
 if __name__ == "__main__":
     import uvicorn

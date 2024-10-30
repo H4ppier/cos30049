@@ -13,7 +13,7 @@ function Prediction(){
     const [formData, setFormData] = useState({
         date_listed: '',
         floor_area_sqm: '',
-        remaining_lease_month: '',
+        remaining_lease_months: '',
         floor_area_sqft: '',
         price_per_sqft: '',
         distance_to_mrt_meters: '',
@@ -32,9 +32,9 @@ function Prediction(){
       const [errors, setErrors] = useState({});
 
       const regexPatterns = {
-        floor_area_sqm: /^\d{1,4}$/,
-        remaining_lease_month: /^\d+$/,
-        floor_area_sqft: /^\d{1,4}$/,
+        floor_area_sqm: /^\d{1,5}$/,
+        remaining_lease_months: /^\d+$/,
+        floor_area_sqft: /^\d{1,5}$/,
         price_per_sqft: /^\d+$/,
         distance_to_mrt_meters: /^\d+$/,
         distance_to_cbd: /^\d+$/,
@@ -59,8 +59,8 @@ function Prediction(){
             valid = false;
         }
 
-        if (!regexPatterns.remaining_lease_month.test(formData.remaining_lease_month)) {
-            newErrors.remaining_lease_month = "Remaining lease must be a valid number";
+        if (!regexPatterns.remaining_lease_months.test(formData.remaining_lease_months)) {
+            newErrors.remaining_lease_months = "Remaining lease must be a valid number";
             valid = false;
         }
 
@@ -106,7 +106,7 @@ function Prediction(){
                 });
                 const result = await response.json();
                 console.log(result); // Handle the prediction result as needed
-                setPredictedPrice(result.original_scale_prediction); // Assume API returns predicted price
+                setPredictedPrice(result.prediction); // Assume API returns predicted price
                 setChartData(result.chart_data); // Assume API returns chart data
             } catch (error) {
                 console.error('Error:', error);
@@ -133,7 +133,7 @@ function Prediction(){
                             </Grid>
 
                             <Grid item xs = {12} sm = {6}>
-                                <TextField sx = {{bgcolor: '#dfead9' }} label="Remaining Lease (months)" name="remaining_lease_month" value={formData.remaining_lease_month} onChange={handleChange} error = {!!errors.remaining_lease_month} helperText = {errors.remaining_lease_month} fullWidth required />
+                                <TextField sx = {{bgcolor: '#dfead9' }} label="Remaining Lease (months)" name="remaining_lease_months" value={formData.remaining_lease_months} onChange={handleChange} error = {!!errors.remaining_lease_months} helperText = {errors.remaining_lease_months} fullWidth required />
                             </Grid>
 
                             <Grid item xs = {12} sm = {6}>
