@@ -106,7 +106,7 @@ function Prediction(){
                 });
                 const result = await response.json();
                 console.log(result); // Handle the prediction result as needed
-                setPredictedPrice(result.prediction); // Assume API returns predicted price
+                setPredictedPrice(result.original_scale_prediction); // Assume API returns predicted price
                 setChartData(result.chart_data); // Assume API returns chart data
             } catch (error) {
                 console.error('Error:', error);

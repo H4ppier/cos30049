@@ -5,6 +5,7 @@ import pickle
 import pandas as pd
 import os
 from datetime import datetime
+from sklearn.preprocessing import StandardScaler
 
 app = FastAPI()
 
@@ -20,6 +21,8 @@ app.add_middleware(
 # Load your trained machine learning model using pickle
 with open('linear_regression_model.pkl', 'rb') as f:
     model = pickle.load(f)
+
+scaler = StandardScaler()
 
 # # Load test dataset and get predicted prices
 # test_data_X = pd.read_csv('X_test.csv')
@@ -58,6 +61,14 @@ def preprocess_input(data: dict):
     
     # Convert input data to DataFrame
     df = pd.DataFrame([data])
+
+    # Scale numerical features
+    numerical_columns = [
+        'floor_area_sqm', 'remaining_lease_month', 
+        'floor_area_sqft', 'price_per_sqft', 'distance_to_mrt_meters',
+        'distance_to_cbd', 'distance_to_pri_school_meters'
+    ]
+    df[numerical_columns] = scaler.transform(df[numerical_columns])
     
     # Apply one-hot encoding
     df_encoded = pd.get_dummies(df, columns=[
@@ -79,11 +90,16 @@ def predict(house: HouseData):
     processed_data = preprocess_input(input_data)
 
     # Make the prediction for the user's input
-    prediction = model.predict(processed_data)
+    scaled_prediction = model.predict(processed_data)
+
+    # Unscale the predicted price
+    original_scale_prediction = scaler.inverse_transform(
+        [scaled_prediction]
+    )[0][0]
 
     # Send both the current prediction and test dataset predictions
     return {
-        "prediction": prediction[0],
+        "prediction": original_scale_prediction[0],
         # "test_predictions": test_predictions.tolist()  # Convert to list for JSON serialization
     }
 
