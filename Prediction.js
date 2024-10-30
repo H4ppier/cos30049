@@ -31,13 +31,14 @@ function Prediction(){
       const regexPatterns = {
         floor_area_sqm: /^\d{1,4}$/,
         remaining_lease_month: /^\d+$/,
+        floor_area_sqft: /^\d{1,4}$/,
+        price_per_sqft: /^\d+$/,
         distance_to_mrt_meters: /^\d+$/,
         distance_to_cbd: /^\d+$/,
-        distance_to_pri_school_meters: /^\d+$/,
-        storey_range: /^\d{1,2}$/
+        distance_to_pri_school_meters: /^\d+$/
       }
 
-      const totalFields = 11; // Total number of fields
+      const totalFields = 14; // Total number of fields
       const filledFields = Object.values(formData).filter(value => value !== '').length;
       const progress = (filledFields / totalFields) * 100; // Percentage completed
     
@@ -60,6 +61,16 @@ function Prediction(){
             valid = false;
         }
 
+        if (!regexPatterns.floor_area_sqft.test(formData.floor_area_sqft)) {
+            newErrors.floor_area_sqft = "Floor area must be a 1-4 digit number";
+            valid = false;
+        }
+
+        if (!regexPatterns.price_per_sqft.test(formData.price_per_sqft)) {
+            newErrors.price_per_sqft = "Floor area must be a 1-4 digit number";
+            valid = false;
+        }
+
         if (!regexPatterns.distance_to_mrt_meters.test(formData.distance_to_mrt_meters)) {
             newErrors.distance_to_mrt_meters = "Distance to MRT must be a valid number";
             valid = false;
@@ -72,11 +83,6 @@ function Prediction(){
 
         if (!regexPatterns.distance_to_pri_school_meters.test(formData.distance_to_pri_school_meters)) {
             newErrors.distance_to_pri_school_meters = "Distance to closest primar school must be a valid number";
-            valid = false;
-        }
-
-        if (!regexPatterns.storey_range.test(formData.storey_range)) {
-            newErrors.storey_range = "Storey range must be a 2 digit number";
             valid = false;
         }
     
@@ -130,6 +136,10 @@ function Prediction(){
                             </Grid>
 
                             <Grid item xs = {12} sm = {6}>
+                                <TextField sx = {{bgcolor: '#dfead9' }} label="Price per Sqft" name="price_per_sqft" value={formData.price_per_sqft} onChange={handleChange} error = {!!errors.price_per_sqft} helperText = {errors.price_per_sqft} FormHelperTextProps={{sx: {bgcolor: 'transparent'}}} fullWidth required />
+                            </Grid>
+
+                            <Grid item xs = {12} sm = {6}>
                                 <TextField sx = {{bgcolor: '#dfead9' }} label="Distance to MRT (meters)" name="distance_to_mrt_meters" value={formData.distance_to_mrt_meters} onChange={handleChange} error = {!!errors.distance_to_mrt_meters} helperText = {errors.distance_to_mrt_meters} fullWidth required />
                             </Grid>
 
@@ -150,7 +160,11 @@ function Prediction(){
                             </Grid>
 
                             <Grid item xs = {12} sm = {6}>
-                                <TextField sx = {{bgcolor: '#dfead9' }} label="Storey Range" name="storey_range" value={formData.storey_range} onChange={handleChange} error = {!!errors.storey_range} helperText = {errors.storey_range} fullWidth required />
+                                <TextField sx = {{bgcolor: '#dfead9' }} select label="Storey Range" name="storey_range" value={formData.storey_range} onChange={handleChange} fullWidth required>
+                                    {['01 TO 03', '04 TO 06', '07 TO 09', '10 TO 12', '13 TO 15', '16 TO 18', '19 TO 21', '22 TO 24', '25 TO 27', '28 TO 30', '31 TO 33', '34 TO 36', '37 TO 39', '40 TO 42', '43 TO 45', '46 TO 48'].map((option) => (
+                                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                                    ))} 
+                                </TextField>
                             </Grid>
 
                             <Grid item xs = {12} sm = {6}>
@@ -177,7 +191,7 @@ function Prediction(){
                                 </TextField>
                             </Grid>
 
-                            <Grid item xs = {12} sm = {12}>
+                            <Grid item xs = {12} sm = {6}>
                                 <TextField sx = {{bgcolor: '#dfead9' }} select label="Line Color" name="line_color" value={formData.line_color} onChange={handleChange} fullWidth required>
                                     {['blue', 'brown', 'green', 'grey', 'orange', 'purple', 'red'].map((option) => (
                                         <MenuItem key={option} value={option}>{option}</MenuItem>
