@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Typography, Button, Box, TextField, LinearProgress, Grid, Card, CardContent, MenuItem
+    Typography, Button, Box, TextField, LinearProgress, Grid, Card, CardContent, MenuItem, Snackbar, Alert, CircularProgress
 } from '@mui/material';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, ArcElement, PointElement, Tooltip, Legend, Title } from 'chart.js';
 import { Bar, Line, Pie, Scatter } from 'react-chartjs-2';
 import './index.css';
-import axios from "axios";
 
 // Register Chart.js components, including PointElement
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, ArcElement, PointElement, Tooltip, Legend, Title);
@@ -34,15 +33,18 @@ function Prediction() {
     const [pieChartData, setPieChartData] = useState(null);
     const [scatterChartData, setScatterChartData] = useState(null);  // Scatter plot data
     const [errors, setErrors] = useState({});
+    const [loading, setLoading] = useState(false); // Loading state
+    const [errorNotification, setErrorNotification] = useState(null); // Error notification state
+    const [firstPredictionMade, setFirstPredictionMade] = useState(false); 
 
     const regexPatterns = {
-        floor_area_sqm: /^\d{1,5}$/,
-        remaining_lease_months: /^\d+$/,
-        floor_area_sqft: /^\d{1,5}$/,
-        price_per_sqft: /^\d+$/,
-        distance_to_mrt_meters: /^\d+$/,
-        distance_to_cbd: /^\d+$/,
-        distance_to_pri_school_meters: /^\d+$/
+        floor_area_sqm: /^\d+(\.\d{1,2})?$/,           // Allows integers or decimal up to 2 places
+        remaining_lease_months: /^\d+$/,               // Integer only
+        floor_area_sqft: /^\d+(\.\d{1,2})?$/,          // Allows integers or decimal up to 2 places
+        price_per_sqft: /^\d+(\.\d{1,2})?$/,           // Allows integers or decimal up to 2 places
+        distance_to_mrt_meters: /^\d+(\.\d{1,2})?$/,   // Allows integers or decimal up to 2 places
+        distance_to_cbd: /^\d+(\.\d{1,2})?$/,          // Allows integers or decimal up to 2 places
+        distance_to_pri_school_meters: /^\d+(\.\d{1,2})?$/  // Allows integers or decimal up to 2 places
     };
 
     const totalFields = 14; // Total number of fields
@@ -69,11 +71,10 @@ function Prediction() {
         return valid;
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const fetchPrediction = async () => {
         if (validate()) {
+            setLoading(true);
             try {
-                // Fetch prediction for the user input
                 const response = await fetch('http://localhost:8000/predict', {
                     method: 'POST',
                     headers: {
@@ -81,15 +82,21 @@ function Prediction() {
                     },
                     body: JSON.stringify(formData),
                 });
+
+                if (!response.ok) {
+                    throw new Error('Server responded with an error.');
+                }
+
                 const result = await response.json();
                 setPredictedPrice(result.prediction);
-    
+                setFirstPredictionMade(true); 
+
                 // Fetch the test dataset predictions
                 const scatterResponse = await fetch('http://localhost:8000/scatter-data');
                 const scatterResult = await scatterResponse.json();
-    
-                // Set Scatter Chart Data
-                setScatterChartData({
+
+                 // Set Scatter Chart Data
+                 setScatterChartData({
                     datasets: [
                         {
                             label: "Predicted Prices (Test Data)",
@@ -108,8 +115,7 @@ function Prediction() {
                         },
                     ],
                 });
-    
-                // Set other charts (if needed)
+
                 setBarChartData({
                     labels: ["Predicted Price", "Floor Area (sqm)", "Price per Sqft", "Remaining Lease (months)"],
                     datasets: [
@@ -125,7 +131,7 @@ function Prediction() {
                         },
                     ],
                 });
-    
+
                 setLineChartData({
                     labels: ["-10% Floor Area", "-5% Floor Area", "Current Prediction", "+5% Floor Area", "+10% Floor Area"],
                     datasets: [
@@ -144,7 +150,7 @@ function Prediction() {
                         },
                     ],
                 });
-    
+
                 setPieChartData({
                     labels: ["Floor Area (sqm)", "Remaining Lease (months)", "Distance to CBD (m)"],
                     datasets: [
@@ -158,15 +164,33 @@ function Prediction() {
                         },
                     ],
                 });
-    
+
             } catch (error) {
+                setErrorNotification('An error occurred while fetching the prediction. Please try again.');
                 console.error('Error:', error);
+            } finally {
+                setLoading(false);
             }
         } else {
-            console.log("Validation failed");
+            setErrorNotification("Validation failed. Please correct the highlighted fields.");
         }
     };
-    
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        fetchPrediction();
+    };
+
+    const formatPrice = (price) => {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(price);
+    };
+
+    useEffect(() => {
+        if (firstPredictionMade) {
+            fetchPrediction();
+        }
+    }, [formData]); 
+
 
 
     return(
@@ -268,31 +292,31 @@ function Prediction() {
                         </Grid>
                     </form>
 
-                    {predictedPrice !== null && (
-                        <Box sx={{ marginTop: 4 }}>
-                            <Typography variant="h6">Predicted Price: ${predictedPrice.toFixed(2)}</Typography>
+                    {loading && (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                            <CircularProgress />
+                        </Box>
+                    )}
 
-                            {/* Bar Chart */}
+                    {predictedPrice !== null && !loading && (
+                        <Box sx={{ marginTop: 4 }}>
+                            <Typography variant="h6">Predicted Price: {formatPrice(predictedPrice)}</Typography>
                             {barChartData && (
                                 <Box sx={{ marginTop: 4 }}>
                                     <Typography variant="h6">Feature Comparison</Typography>
-                                    <Bar data={barChartData} />
+                                    <Bar data={barChartData} options={{ responsive: true }} />
                                 </Box>
                             )}
-
-                            {/* Line Chart */}
                             {lineChartData && (
                                 <Box sx={{ marginTop: 4 }}>
-                                    <Typography variant="h6">Price Prediction Adjustments</Typography>
-                                    <Line data={lineChartData} />
+                                    <Typography variant="h6">Price Prediction with Floor Area Adjustment</Typography>
+                                    <Line data={lineChartData} options={{ responsive: true }} />
                                 </Box>
                             )}
-
-                            {/* Pie Chart */}
                             {pieChartData && (
                                 <Box sx={{ marginTop: 4 }}>
-                                    <Typography variant="h6">Feature Breakdown</Typography>
-                                    <Pie data={pieChartData} />
+                                    <Typography variant="h6">Input Feature Proportion</Typography>
+                                    <Pie data={pieChartData} options={{ responsive: true }} />
                                 </Box>
                             )}
 
@@ -305,6 +329,12 @@ function Prediction() {
                             )}
                         </Box>
                     )}
+
+                    <Snackbar open={!!errorNotification} autoHideDuration={6000} onClose={() => setErrorNotification(null)}>
+                        <Alert onClose={() => setErrorNotification(null)} severity="error" sx={{ width: '100%' }}>
+                            {errorNotification}
+                        </Alert>
+                    </Snackbar>
                 </CardContent>
             </Card>
         </Grid>
