@@ -1,15 +1,15 @@
-import React, {useState} from 'react';
-import './index.css';
+import React, { useState } from 'react';
 import {
-    AppBar, Toolbar, Typography, Button, Box,
-    Drawer, List, ListItem, ListItemIcon, ListItemText, IconButton, TextField,
-    Switch, Snackbar, Alert, Fab, Dialog, DialogTitle, DialogContent,
-    DialogContentText,
-    DialogActions, CircularProgress, LinearProgress, Chip, Avatar, Divider, Grid, Card, CardContent, MenuItem
-    } from '@mui/material';
-import {Line} from 'react-chartjs-2';
+    Typography, Button, Box, TextField, LinearProgress, Grid, Card, CardContent, MenuItem
+} from '@mui/material';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, ArcElement, PointElement, Tooltip, Legend, Title } from 'chart.js';
+import { Bar, Line, Pie } from 'react-chartjs-2';
+import './index.css';
 
-function Prediction(){
+// Register Chart.js components, including PointElement
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, ArcElement, PointElement, Tooltip, Legend, Title);
+
+function Prediction() {
     const [formData, setFormData] = useState({
         date_listed: '',
         floor_area_sqm: '',
@@ -25,13 +25,15 @@ function Prediction(){
         region_ura: '',
         transport_type: '',
         line_color: ''
-      });
+    });
 
-      const [predictedPrice, setPredictedPrice] = useState(null);
-      const [chartData, setChartData] = useState(null);
-      const [errors, setErrors] = useState({});
+    const [predictedPrice, setPredictedPrice] = useState(null);
+    const [barChartData, setBarChartData] = useState(null);
+    const [lineChartData, setLineChartData] = useState(null);
+    const [pieChartData, setPieChartData] = useState(null);
+    const [errors, setErrors] = useState({});
 
-      const regexPatterns = {
+    const regexPatterns = {
         floor_area_sqm: /^\d{1,5}$/,
         remaining_lease_months: /^\d+$/,
         floor_area_sqft: /^\d{1,5}$/,
@@ -39,61 +41,33 @@ function Prediction(){
         distance_to_mrt_meters: /^\d+$/,
         distance_to_cbd: /^\d+$/,
         distance_to_pri_school_meters: /^\d+$/
-      }
+    };
 
-      const totalFields = 14; // Total number of fields
-      const filledFields = Object.values(formData).filter(value => value !== '').length;
-      const progress = (filledFields / totalFields) * 100; // Percentage completed
-    
-      const handleChange = (e) => {
+    const totalFields = 14; // Total number of fields
+    const filledFields = Object.values(formData).filter(value => value !== '').length;
+    const progress = (filledFields / totalFields) * 100; // Percentage completed
+
+    const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
-        setErrors({ ...errors, [e.target.name]: ''});
-      };
+        setErrors({ ...errors, [e.target.name]: '' });
+    };
 
-      const validate = () => {
+    const validate = () => {
         let valid = true;
         const newErrors = {};
 
-        if (!regexPatterns.floor_area_sqm.test(formData.floor_area_sqm)) {
-            newErrors.floor_area_sqm = "Floor area must be a 1-4 digit number";
-            valid = false;
-        }
+        Object.keys(regexPatterns).forEach((key) => {
+            if (!regexPatterns[key].test(formData[key])) {
+                newErrors[key] = `${key.replace(/_/g, ' ')} must be a valid number`;
+                valid = false;
+            }
+        });
 
-        if (!regexPatterns.remaining_lease_months.test(formData.remaining_lease_months)) {
-            newErrors.remaining_lease_months = "Remaining lease must be a valid number";
-            valid = false;
-        }
-
-        if (!regexPatterns.floor_area_sqft.test(formData.floor_area_sqft)) {
-            newErrors.floor_area_sqft = "Floor area must be a 1-4 digit number";
-            valid = false;
-        }
-
-        if (!regexPatterns.price_per_sqft.test(formData.price_per_sqft)) {
-            newErrors.price_per_sqft = "Floor area must be a 1-4 digit number";
-            valid = false;
-        }
-
-        if (!regexPatterns.distance_to_mrt_meters.test(formData.distance_to_mrt_meters)) {
-            newErrors.distance_to_mrt_meters = "Distance to MRT must be a valid number";
-            valid = false;
-        }
-
-        if (!regexPatterns.distance_to_cbd.test(formData.distance_to_cbd)) {
-            newErrors.distance_to_cbd = "Distance to CBD must be a valid number";
-            valid = false;
-        }
-
-        if (!regexPatterns.distance_to_pri_school_meters.test(formData.distance_to_pri_school_meters)) {
-            newErrors.distance_to_pri_school_meters = "Distance to closest primar school must be a valid number";
-            valid = false;
-        }
-    
         setErrors(newErrors);
         return valid;
-      };
-    
-      const handleSubmit = async (e) => {
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (validate()) {
             try {
@@ -105,9 +79,60 @@ function Prediction(){
                     body: JSON.stringify(formData),
                 });
                 const result = await response.json();
-                console.log(result); // Handle the prediction result as needed
-                setPredictedPrice(result.prediction); // Assume API returns predicted price
-                setChartData(result.chart_data); // Assume API returns chart data
+                setPredictedPrice(result.prediction);
+
+                // Set Bar Chart Data
+                setBarChartData({
+                    labels: ["Predicted Price", "Floor Area (sqm)", "Price per Sqft", "Remaining Lease (months)"],
+                    datasets: [
+                        {
+                            label: "Values",
+                            data: [
+                                result.prediction,
+                                parseFloat(formData.floor_area_sqm),
+                                parseFloat(formData.price_per_sqft),
+                                parseInt(formData.remaining_lease_months)
+                            ],
+                            backgroundColor: ["rgba(75, 192, 192, 0.6)", "rgba(153, 102, 255, 0.6)", "rgba(255, 159, 64, 0.6)", "rgba(255, 206, 86, 0.6)"],
+                        },
+                    ],
+                });
+
+                // Set Line Chart Data (Predicted Price with Adjustments)
+                setLineChartData({
+                    labels: ["-10% Floor Area", "-5% Floor Area", "Current Prediction", "+5% Floor Area", "+10% Floor Area"],
+                    datasets: [
+                        {
+                            label: "Predicted Price with Floor Area Adjustment",
+                            data: [
+                                result.prediction * 0.9,
+                                result.prediction * 0.95,
+                                result.prediction,
+                                result.prediction * 1.05,
+                                result.prediction * 1.1
+                            ],
+                            fill: false,
+                            borderColor: "rgba(75, 192, 192, 1)",
+                            tension: 0.1,
+                        },
+                    ],
+                });
+
+                // Set Pie Chart Data (Feature Breakdown)
+                setPieChartData({
+                    labels: ["Floor Area (sqm)", "Remaining Lease (months)", "Distance to CBD (m)"],
+                    datasets: [
+                        {
+                            data: [
+                                parseFloat(formData.floor_area_sqm),
+                                parseInt(formData.remaining_lease_months),
+                                parseFloat(formData.distance_to_cbd)
+                            ],
+                            backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56"],
+                        },
+                    ],
+                });
+
             } catch (error) {
                 console.error('Error:', error);
             }
@@ -218,13 +243,31 @@ function Prediction(){
 
                     {predictedPrice !== null && (
                         <Box sx={{ marginTop: 4 }}>
-                            <Typography variant="h6">Predicted Price: ${predictedPrice}</Typography>
-                            {/* {chartData && (
-                                <Box sx={{ marginTop: 2 }}>
-                                    <Typography variant="h6">Price Trend:</Typography>
-                                    <Line data={chartData} />
+                            <Typography variant="h6">Predicted Price: ${predictedPrice.toFixed(2)}</Typography>
+
+                            {/* Bar Chart */}
+                            {barChartData && (
+                                <Box sx={{ marginTop: 4 }}>
+                                    <Typography variant="h6">Feature Comparison</Typography>
+                                    <Bar data={barChartData} options={{ responsive: true }} />
                                 </Box>
-                            )} */}
+                            )}
+
+                            {/* Line Chart */}
+                            {lineChartData && (
+                                <Box sx={{ marginTop: 4 }}>
+                                    <Typography variant="h6">Price Prediction with Floor Area Adjustment</Typography>
+                                    <Line data={lineChartData} options={{ responsive: true }} />
+                                </Box>
+                            )}
+
+                            {/* Pie Chart */}
+                            {pieChartData && (
+                                <Box sx={{ marginTop: 4 }}>
+                                    <Typography variant="h6">Input Feature Proportion</Typography>
+                                    <Pie data={pieChartData} options={{ responsive: true }} />
+                                </Box>
+                            )}
                         </Box>
                     )}
                 </CardContent>
