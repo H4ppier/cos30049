@@ -25,9 +25,37 @@ with open('linear_regression_model.pkl', 'rb') as f:
 with open('scaler.pkl', 'rb') as f:
     scaler = pickle.load(f)
 
-# Create a directory for saving plots if it doesn't exist
-if not os.path.exists("plots"):
-    os.makedirs("plots")
+# Load test data
+test_data = pd.read_csv("X_test.csv")  # Load your test dataset
+
+def predict_test_data():
+    df = test_data.copy()
+
+    # Make predictions on the scaled test data
+    scaled_predictions = model.predict(df)
+
+    # Create a DataFrame for inverse transformation
+    # We will need to create a DataFrame that contains all features that were scaled
+    # to perform the inverse transformation correctly.
+    scaled_df = df.copy()
+    scaled_df['predicted_price'] = scaled_predictions
+
+    # Inverse transform for the features you scaled
+    # Only include the columns that were originally scaled
+    numerical_columns = [
+        'remaining_lease_months', 'floor_area_sqft', 'price_per_sqft', 
+        'distance_to_mrt_meters', 'distance_to_cbd', 'distance_to_pri_school_meters'
+    ]
+    
+    # Assuming 'scaler' was fitted on these columns
+    unscaled_values = scaler.inverse_transform(scaled_df[numerical_columns])
+
+    # Update the DataFrame with unscaled values
+    for i, col in enumerate(numerical_columns):
+        scaled_df[col] = unscaled_values[:, i]
+
+    return scaled_df[['floor_area_sqft', 'predicted_price']]  # Columns for scatter plot
+
 
 class HouseData(BaseModel):
     date_listed: str  # Expecting date in 'YYYY-MM-DD' format
@@ -86,6 +114,13 @@ def predict(house: HouseData):
     scaled_prediction = model.predict(processed_data)
 
     return {"prediction": scaled_prediction[0]}  # Return first prediction
+
+@app.get("/scatter-data")
+def scatter_data():
+    test_predictions = predict_test_data()
+    return {
+        "scatter_data": test_predictions.to_dict(orient="records")
+    }
 
 if __name__ == "__main__":
     import uvicorn

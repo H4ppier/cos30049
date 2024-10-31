@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Typography, Button, Box, TextField, LinearProgress, Grid, Card, CardContent, MenuItem
 } from '@mui/material';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, ArcElement, PointElement, Tooltip, Legend, Title } from 'chart.js';
-import { Bar, Line, Pie } from 'react-chartjs-2';
+import { Bar, Line, Pie, Scatter } from 'react-chartjs-2';
 import './index.css';
+import axios from "axios";
 
 // Register Chart.js components, including PointElement
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, ArcElement, PointElement, Tooltip, Legend, Title);
@@ -31,6 +32,7 @@ function Prediction() {
     const [barChartData, setBarChartData] = useState(null);
     const [lineChartData, setLineChartData] = useState(null);
     const [pieChartData, setPieChartData] = useState(null);
+    const [scatterChartData, setScatterChartData] = useState(null);  // Scatter plot data
     const [errors, setErrors] = useState({});
 
     const regexPatterns = {
@@ -71,6 +73,7 @@ function Prediction() {
         e.preventDefault();
         if (validate()) {
             try {
+                // Fetch prediction for the user input
                 const response = await fetch('http://localhost:8000/predict', {
                     method: 'POST',
                     headers: {
@@ -80,8 +83,33 @@ function Prediction() {
                 });
                 const result = await response.json();
                 setPredictedPrice(result.prediction);
-
-                // Set Bar Chart Data
+    
+                // Fetch the test dataset predictions
+                const scatterResponse = await fetch('http://localhost:8000/scatter-data');
+                const scatterResult = await scatterResponse.json();
+    
+                // Set Scatter Chart Data
+                setScatterChartData({
+                    datasets: [
+                        {
+                            label: "Predicted Prices (Test Data)",
+                            data: scatterResult.scatter_data.map((dataPoint) => ({
+                                x: dataPoint.floor_area_sqft,  // Replace with the appropriate feature name
+                                y: dataPoint.predicted_price,
+                            })),
+                            backgroundColor: "rgba(99, 132, 255, 0.5)",
+                            pointRadius: 5,
+                        },
+                        {
+                            label: "Current Prediction",
+                            data: [{ x: formData.floor_area_sqft, y: result.prediction }],
+                            backgroundColor: "rgba(255, 99, 132, 1)",
+                            pointRadius: 8,
+                        },
+                    ],
+                });
+    
+                // Set other charts (if needed)
                 setBarChartData({
                     labels: ["Predicted Price", "Floor Area (sqm)", "Price per Sqft", "Remaining Lease (months)"],
                     datasets: [
@@ -97,8 +125,7 @@ function Prediction() {
                         },
                     ],
                 });
-
-                // Set Line Chart Data (Predicted Price with Adjustments)
+    
                 setLineChartData({
                     labels: ["-10% Floor Area", "-5% Floor Area", "Current Prediction", "+5% Floor Area", "+10% Floor Area"],
                     datasets: [
@@ -117,8 +144,7 @@ function Prediction() {
                         },
                     ],
                 });
-
-                // Set Pie Chart Data (Feature Breakdown)
+    
                 setPieChartData({
                     labels: ["Floor Area (sqm)", "Remaining Lease (months)", "Distance to CBD (m)"],
                     datasets: [
@@ -132,7 +158,7 @@ function Prediction() {
                         },
                     ],
                 });
-
+    
             } catch (error) {
                 console.error('Error:', error);
             }
@@ -140,6 +166,7 @@ function Prediction() {
             console.log("Validation failed");
         }
     };
+    
 
 
     return(
@@ -249,23 +276,31 @@ function Prediction() {
                             {barChartData && (
                                 <Box sx={{ marginTop: 4 }}>
                                     <Typography variant="h6">Feature Comparison</Typography>
-                                    <Bar data={barChartData} options={{ responsive: true }} />
+                                    <Bar data={barChartData} />
                                 </Box>
                             )}
 
                             {/* Line Chart */}
                             {lineChartData && (
                                 <Box sx={{ marginTop: 4 }}>
-                                    <Typography variant="h6">Price Prediction with Floor Area Adjustment</Typography>
-                                    <Line data={lineChartData} options={{ responsive: true }} />
+                                    <Typography variant="h6">Price Prediction Adjustments</Typography>
+                                    <Line data={lineChartData} />
                                 </Box>
                             )}
 
                             {/* Pie Chart */}
                             {pieChartData && (
                                 <Box sx={{ marginTop: 4 }}>
-                                    <Typography variant="h6">Input Feature Proportion</Typography>
-                                    <Pie data={pieChartData} options={{ responsive: true }} />
+                                    <Typography variant="h6">Feature Breakdown</Typography>
+                                    <Pie data={pieChartData} />
+                                </Box>
+                            )}
+
+                            {/* Scatter Plot */}
+                            {scatterChartData && (
+                                <Box sx={{ marginTop: 4 }}>
+                                    <Typography variant="h6">Scatter Plot of Predicted Prices</Typography>
+                                    <Scatter data={scatterChartData} />
                                 </Box>
                             )}
                         </Box>
