@@ -1,117 +1,92 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from pydantic import BaseModel
-from sqlalchemy import Column, Integer, String, create_engine, text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import pickle
+import pandas as pd
+import os
+from datetime import datetime
 
-# Database Configuration
-DATABASE_URL = "mysql://root:#Thunder234@localhost:3306"
-DATABASE_NAME = "user"
-
-# Initial engine for database creation
-initial_engine = create_engine(DATABASE_URL)
-Base = declarative_base()
-
-# Create the database if it doesn’t exist
-def create_database():
-    with initial_engine.connect() as connection:
-        connection.execute(text(f"CREATE DATABASE IF NOT EXISTS {DATABASE_NAME}"))
-    connection.close()
-
-create_database()  # Ensure the database is created before proceeding
-
-# Reconfigure the engine to use the newly created database
-engine = create_engine(f"{DATABASE_URL}/{DATABASE_NAME}")
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# JWT Configuration
-SECRET_KEY = "your_secret_key"  # Replace with a secure, unique key
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# FastAPI app
 app = FastAPI()
 
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Update with your frontend URL
+    allow_origins=["http://localhost:3000"],  # URL of your React application
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Dependency for DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Load your trained machine learning model using pickle
+with open('linear_regression_model.pkl', 'rb') as f:
+    model = pickle.load(f)
 
-# Database Model
-class User(Base):
-    __tablename__ = "users"
+# Uncomment the scaler loading if needed
+with open('scaler.pkl', 'rb') as f:
+    scaler = pickle.load(f)
+
+# Create a directory for saving plots if it doesn't exist
+if not os.path.exists("plots"):
+    os.makedirs("plots")
+
+class HouseData(BaseModel):
+    date_listed: str  # Expecting date in 'YYYY-MM-DD' format
+    floor_area_sqm: float
+    remaining_lease_months: int
+    floor_area_sqft: float
+    price_per_sqft: float
+    distance_to_mrt_meters: float
+    distance_to_cbd: float
+    distance_to_pri_school_meters: float
+    flat_type: str
+    storey_range: str
+    flat_model: str
+    region_ura: str
+    transport_type: str
+    line_color: str
+
+def preprocess_input(data: dict):
+    # Convert 'date_listed' to Unix timestamp
+    date_obj = datetime.strptime(data['date_listed'], "%Y-%m-%d")
+    data['date_listed'] = int(date_obj.timestamp())
+
+    # Convert input data to DataFrame
+    df = pd.DataFrame([data])
+
+    # Scale numerical features using the scaler
+    numerical_columns = [
+        'remaining_lease_months', 'floor_area_sqft', 'price_per_sqft', 
+        'distance_to_mrt_meters', 'distance_to_cbd', 'distance_to_pri_school_meters'
+    ]
     
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True)
-    email = Column(String(100), unique=True, index=True)
-    password = Column(String(100))  # Plaintext password
+    # Scale the numerical features
+    df[numerical_columns] = scaler.transform(df[numerical_columns])
 
-# Create the database tables if they don’t exist
-Base.metadata.create_all(bind=engine, checkfirst=True)  # Ensures tables are created only if they don’t exist
+    # One-hot encoding for categorical fields
+    df_encoded = pd.get_dummies(df, columns=[
+        'flat_type', 'storey_range', 'flat_model', 'region_ura', 'transport_type', 'line_color'
+    ])
 
-# Pydantic Schemas
-class UserCreate(BaseModel):
-    username: str
-    email: str
-    password: str
+    # Align encoded DataFrame with model features
+    model_features = model.feature_names_in_
+    for col in model_features:
+        if col not in df_encoded.columns:
+            df_encoded[col] = 0  # Fill missing columns with zeros
 
-class UserLogin(BaseModel):
-    username: str
-    password: str
+    # Ensure correct ordering of features
+    return df_encoded[model_features]
 
-# Utility function to create access token
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+@app.post("/predict")
+def predict(house: HouseData):
+    # Prepare input data for prediction
+    input_data = house.dict()
+    processed_data = preprocess_input(input_data)
 
-# CRUD functions
-def create_user(db: Session, username: str, email: str, password: str):
-    db_user = User(username=username, email=email, password=password)  # Store password directly
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+    # Make prediction
+    scaled_prediction = model.predict(processed_data)
 
-def authenticate_user(db: Session, username: str, password: str):
-    user = db.query(User).filter(User.username == username).first()
-    if user and user.password == password:  # Compare password directly
-        return user
-    return None
+    return {"prediction": scaled_prediction[0]}  # Return first prediction
 
-# API Routes
-@app.post("/signup", response_model=dict)
-def signup(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.username == user.username).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
-    create_user(db, user.username, user.email, user.password)
-    return {"msg": "User created successfully"}
-
-@app.post("/login", response_model=dict)
-def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = authenticate_user(db, user.username, user.password)
-    if not db_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = create_access_token(data={"sub": db_user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
