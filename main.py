@@ -26,7 +26,7 @@ with open('scaler.pkl', 'rb') as f:
     scaler = pickle.load(f)
 
 # Load test data
-test_data = pd.read_csv("X_test.csv")  # Load your test dataset
+test_data = pd.read_csv("../src/X_test.csv")  # Load your test dataset
 
 def predict_test_data():
     df = test_data.copy()
