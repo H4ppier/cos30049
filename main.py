@@ -299,16 +299,32 @@ def get_flat_model_distribution(chosen_model: str = Query(None)):
 
     return distribution
 
-# @app.get("/remaining-lease-distribution")
-# def get_remaining_lease_distribution() -> List[int]:
-#     # Assuming 'remaining_lease_month' is the column for remaining lease
-#     distribution = test_data['remaining_lease_months'].value_counts().sort_index().to_dict()
+@app.get("/remaining-lease-distribution")
+def get_remaining_lease_distribution(user_lease: int = Query(None)) -> dict:
+    # Fetch unscaled test data with unscaled remaining_lease_months
+    unscaled_test_data = predict_test_data()
     
-#     # Convert the dictionary to a list of frequencies for histogram
-#     lease_values = list(distribution.keys())
-#     frequencies = list(distribution.values())
-    
-#     return {"lease_values": lease_values, "frequencies": frequencies}
+    # Calculate the distribution using unscaled remaining lease months
+    distribution = unscaled_test_data['remaining_lease_months'].value_counts().sort_index().to_dict()
+
+    # Separate keys and values into two lists
+    lease_values = list(distribution.keys())
+    frequencies = list(distribution.values())
+
+    # Update distribution with user's input
+    if user_lease is not None:
+        if user_lease in distribution:
+            distribution[user_lease] += 1  # Increment the count
+        else:
+            distribution[user_lease] = 1  # Add new entry with count 1
+        # Sort again to maintain order
+        distribution = dict(sorted(distribution.items()))
+
+    # Prepare data for return
+    lease_values = list(distribution.keys())
+    frequencies = list(distribution.values())
+
+    return {"lease_values": lease_values, "frequencies": frequencies}
 
 if __name__ == "__main__":
     import uvicorn

@@ -4,8 +4,12 @@ import {
 } from '@mui/material';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, ArcElement, PointElement, Tooltip, Legend, Title } from 'chart.js';
 import { Bar, Line, Pie, Scatter } from 'react-chartjs-2';
+import { Chart, registerables } from 'chart.js';
 import Plot from 'react-plotly.js';
 import './index.css';
+import zoomPlugin from 'chartjs-plugin-zoom';
+
+Chart.register(...registerables, zoomPlugin);
 
 // Register Chart.js components, including PointElement
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, ArcElement, PointElement, Tooltip, Legend, Title);
@@ -102,9 +106,10 @@ function Prediction() {
                 const distributionResponse = await fetch(`http://localhost:8000/flat-model-distribution?chosen_model=${chosenModelWithPrefix}`);
                 const distributions = await distributionResponse.json();
     
-                // // Fetch remaining lease distribution
-                // const leaseResponse = await fetch('http://localhost:8000/remaining-lease-distribution');
-                // const leaseData = await leaseResponse.json();
+                // Fetch remaining lease distribution and pass the user input
+                const leaseResponse = await fetch(`http://localhost:8000/remaining-lease-distribution?user_lease=${formData.remaining_lease_months}`);
+                const leaseData = await leaseResponse.json();
+
     
                 // Scatter Chart Data
                 setScatterChartData({
@@ -145,18 +150,24 @@ function Prediction() {
                         },
                     ],
                 });
-    
-                // // Prepare data for the histogram
-                // setLeaseHistogramData({
-                //     labels: leaseData.lease_values,
-                //     datasets: [
-                //         {
-                //             label: "Remaining Lease Distribution",
-                //             data: leaseData.frequencies,
-                //             backgroundColor: "rgba(75, 192, 192, 0.6)",
-                //         },
-                //     ],
-                // });
+
+                // Highlight the user's input in the histogram
+                const userLeaseValue = Number(formData.remaining_lease_months); // Convert to number if necessary
+
+                // Prepare data for the histogram
+                setLeaseHistogramData({
+                    labels: leaseData.lease_values, // Lease range labels
+                    datasets: [
+                        {
+                            label: "Remaining Lease Distribution",
+                            data: leaseData.frequencies, // Frequencies
+                            backgroundColor: leaseData.lease_values.map(value =>
+                                Number(value) === userLeaseValue ? "rgba(255, 99, 132, 1)" : "rgba(75, 192, 192, 0.6)"
+                            ), // Ensure both are numbers for comparison
+                        },
+                    ],
+                });
+
     
             } catch (error) {
                 setErrorNotification('An error occurred while fetching the prediction. Please try again.');
@@ -360,7 +371,6 @@ function Prediction() {
                                 </div>
                             )}
                             
-                            {/* Render the histogram if data is available
                             {leaseHistogramData && (
                                 <div style={{ marginTop: '20px' }}>
                                     <Typography variant="h6">Remaining Lease Distribution Histogram</Typography>
@@ -371,7 +381,7 @@ function Prediction() {
                                                 {
                                                     label: "Remaining Lease Counts",
                                                     data: leaseHistogramData.datasets[0].data, // Frequencies
-                                                    backgroundColor: "rgba(75, 192, 192, 0.6)",
+                                                    backgroundColor: leaseHistogramData.datasets[0].backgroundColor, // Highlighted colors
                                                 },
                                             ],
                                         }}
@@ -384,6 +394,21 @@ function Prediction() {
                                                 title: {
                                                     display: true,
                                                     text: 'Distribution of Remaining Lease',
+                                                },
+                                                zoom: {
+                                                    pan: {
+                                                        enabled: true,
+                                                        mode: 'x', // Allows horizontal panning only
+                                                    },
+                                                    zoom: {
+                                                        wheel: {
+                                                            enabled: true, // Enables zoom on mouse wheel
+                                                        },
+                                                        pinch: {
+                                                            enabled: true, // Enables zoom on pinch for touch devices
+                                                        },
+                                                        mode: 'x', // Allows horizontal zoom only
+                                                    },
                                                 },
                                             },
                                             scales: {
@@ -404,7 +429,9 @@ function Prediction() {
                                         }}
                                     />
                                 </div>
-                            )} */}
+                            )}
+
+
                         </Box>
                     )}
 
