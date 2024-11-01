@@ -4,9 +4,9 @@ import {
   ListItemIcon, ListItemText, Snackbar, Alert, Switch, Divider, Grid, Card, CardContent, Paper
 } from '@mui/material';
 import { Menu as MenuIcon, Home as HomeIcon, Info as InfoIcon, Mail as MailIcon } from '@mui/icons-material';
-import welcomeBg from './AboutUsPagePic/meeting-bg.jpg'; // Import the image
-// import achievementImage from './assets/achievement.jpg';
-// import vision from './assets/vision.png';
+import welcomeBg from './assets/meeting-bg.jpg'; // Import the image
+import achievementImage from './assets/achievement.jpg';
+import vision from './assets/vision.png';
 
 function AboutUs() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -57,15 +57,7 @@ function AboutUs() {
     <Box sx={{ backgroundColor: '#E8F5E9', flexGrow: 1 }}>
       
 
-      <Drawer anchor="left" open={drawerOpen} onClose={toggleDrawer(false)}>
-        {drawerContent}
-      </Drawer>
-
-      <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
-        <Alert onClose={handleSnackbarClose} severity="success" sx={{ width: '100%' }}>
-          {darkMode ? 'Dark mode enabled!' : 'Light mode enabled!'}
-        </Alert>
-      </Snackbar>
+      
 
       {/* Enlarged Carousel Section with Heading and Description */}
       <Box
@@ -142,3 +134,4 @@ function AboutUs() {
 }
 
 export default AboutUs;
+
