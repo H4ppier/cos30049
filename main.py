@@ -1,10 +1,42 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.security import OAuth2PasswordBearer
 import pickle
 import pandas as pd
 import os
 from datetime import datetime
+from fastapi import FastAPI, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy import Column, Integer, String, create_engine, text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
+
+# Database Configuration
+DATABASE_URL = "mysql://root:G1briel1234@localhost:3306"
+DATABASE_NAME = "user"
+
+# Initial engine for database creation
+initial_engine = create_engine(DATABASE_URL)
+Base = declarative_base()
+
+# Create the database if it doesn’t exist
+def create_database():
+    with initial_engine.connect() as connection:
+        connection.execute(text(f"CREATE DATABASE IF NOT EXISTS {DATABASE_NAME}"))
+    connection.close()
+
+create_database()  # Ensure the database is created before proceeding
+
+# Reconfigure the engine to use the newly created database
+engine = create_engine(f"{DATABASE_URL}/{DATABASE_NAME}")
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# JWT Configuration
+SECRET_KEY = "your_secret_key"  # Replace with a secure, unique key
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 app = FastAPI()
 
@@ -16,6 +48,86 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Dependency for DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50, collation='utf8_bin'), unique=True, index=True)  # Case-sensitive
+    email = Column(String(100, collation='utf8_bin'), unique=True, index=True)  # Case-sensitive
+    password = Column(String(100))
+
+# Create the database tables if they don’t exist
+Base.metadata.create_all(bind=engine, checkfirst=True)  # Ensures tables are created only if they don’t exist
+
+# Pydantic Schemas
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+# Utility function to create access token
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+# CRUD functions
+def create_user(db: Session, username: str, email: str, password: str):
+    db_user = User(username=username, email=email, password=password)  # Store password directly
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+# def authenticate_user(db: Session, username: str, password: str):
+#     user = db.query(User).filter(User.username == username).first()
+#     if user and user.password == password:  # Compare password directly
+#         return user
+#     return None
+
+def authenticate_user(db: Session, username: str, password: str):
+    user = db.query(User).filter(User.username == username).first()
+    if user and user.username == username and user.password == password:  # Explicitly check username case
+        return user
+    return None
+
+# API Routes
+@app.post("/signup", response_model=dict)
+def signup(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    create_user(db, user.username, user.email, user.password)
+    return {"msg": "User created successfully"}
+
+@app.post("/login", response_model=dict)
+def login(user: UserLogin, db: Session = Depends(get_db)):
+    db_user = authenticate_user(db, user.username, user.password)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(data={"sub": db_user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 # Load your trained machine learning model using pickle
 with open('linear_regression_model.pkl', 'rb') as f:
@@ -103,6 +215,55 @@ def preprocess_input(data: dict):
 
     # Ensure correct ordering of features
     return df_encoded[model_features]
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# Function to get the current user from the token
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        user = db.query(User).filter(User.username == username).first()
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        return user
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# Profile endpoint to get user details
+@app.get("/profile")
+def get_profile(user: User = Depends(get_current_user)):
+    return {"username": user.username, "email": user.email}
+
+# Profile endpoint to update user details
+class UserUpdate(BaseModel):
+    username: str
+    email: str
+
+@app.put("/profile")
+def update_profile(updated_user: UserUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Check if the new username or email is already taken by another user
+    if updated_user.username != user.username:
+        existing_user = db.query(User).filter(User.username == updated_user.username).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username is already taken")
+
+    if updated_user.email != user.email:
+        existing_email = db.query(User).filter(User.email == updated_user.email).first()
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email is already taken")
+
+    # Update user information
+    user.username = updated_user.username
+    user.email = updated_user.email
+    db.commit()  # Commit the changes to the database
+    db.refresh(user)  # Refresh the user object with the updated data
+
+    return {"msg": "Profile updated successfully"}
 
 @app.post("/predict")
 def predict(house: HouseData):
