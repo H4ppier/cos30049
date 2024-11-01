@@ -7,7 +7,7 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import axios from 'axios';
 
-function Login(){
+function Login({ setIsAuthenticated }){
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -47,8 +47,9 @@ function Login(){
 
     try {
       const response = await axios.post('http://127.0.0.1:8000/login', formData);
-      localStorage.setItem('token', response.data.access_token); // Store JWT token
-      navigate('/'); // Redirect to a protected route or dashboard
+      localStorage.setItem('token', response.data.access_token);
+      setIsAuthenticated(true); // Update authentication state
+      navigate('/'); // Redirect to the home page
     } catch (error) {
       if (error.response && error.response.status === 401) {
         setLoginError('Invalid username or password');
