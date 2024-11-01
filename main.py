@@ -3,7 +3,7 @@ import pickle
 import pandas as pd
 import os
 from datetime import datetime
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Query
 from pydantic import BaseModel
 from sqlalchemy import Column, Integer, String, create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
@@ -11,10 +11,11 @@ from sqlalchemy.orm import sessionmaker, Session
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional
+from typing import Optional, List
+
 
 # Database Configuration
-DATABASE_URL = "mysql://root:G1briel1234@localhost:3306"
+DATABASE_URL = "mysql://root:Nick*2004@localhost:3306"
 DATABASE_NAME = "user"
 
 # Initial engine for database creation
@@ -166,7 +167,7 @@ def predict_test_data():
     for i, col in enumerate(numerical_columns):
         scaled_df[col] = unscaled_values[:, i]
 
-    return scaled_df[['floor_area_sqft', 'predicted_price']]  # Columns for scatter plot
+    return scaled_df[['floor_area_sqft', 'predicted_price', 'remaining_lease_months', 'price_per_sqft', 'distance_to_mrt_meters', 'distance_to_cbd', 'distance_to_pri_school_meters']]  # Columns for scatter plot and bar chart
 
 
 class HouseData(BaseModel):
@@ -282,6 +283,32 @@ def scatter_data():
     return {
         "scatter_data": test_predictions.to_dict(orient="records")
     }
+
+@app.get("/flat-model-distribution")
+def get_flat_model_distribution(chosen_model: str = Query(None)):
+    # Get counts of each flat model based on one-hot encoded columns
+    distribution = test_data.filter(like='flat_model_').sum().to_dict()
+    
+    print("Initial distribution:", distribution)
+    print("Chosen model:", chosen_model)
+
+    # If a model is chosen, increment its count for highlighting
+    if chosen_model in distribution:
+        distribution[chosen_model] += 1  # Increment the count for the chosen model
+        print(f"Incremented count for {chosen_model}: {distribution[chosen_model]}")
+
+    return distribution
+
+# @app.get("/remaining-lease-distribution")
+# def get_remaining_lease_distribution() -> List[int]:
+#     # Assuming 'remaining_lease_month' is the column for remaining lease
+#     distribution = test_data['remaining_lease_months'].value_counts().sort_index().to_dict()
+    
+#     # Convert the dictionary to a list of frequencies for histogram
+#     lease_values = list(distribution.keys())
+#     frequencies = list(distribution.values())
+    
+#     return {"lease_values": lease_values, "frequencies": frequencies}
 
 if __name__ == "__main__":
     import uvicorn

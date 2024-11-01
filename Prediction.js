@@ -4,6 +4,7 @@ import {
 } from '@mui/material';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, ArcElement, PointElement, Tooltip, Legend, Title } from 'chart.js';
 import { Bar, Line, Pie, Scatter } from 'react-chartjs-2';
+import Plot from 'react-plotly.js';
 import './index.css';
 
 // Register Chart.js components, including PointElement
@@ -29,6 +30,7 @@ function Prediction() {
 
     const [predictedPrice, setPredictedPrice] = useState(null);
     const [barChartData, setBarChartData] = useState(null);
+    const [leaseHistogramData, setLeaseHistogramData] = useState(null);
     const [lineChartData, setLineChartData] = useState(null);
     const [pieChartData, setPieChartData] = useState(null);
     const [scatterChartData, setScatterChartData] = useState(null);  // Scatter plot data
@@ -75,6 +77,7 @@ function Prediction() {
         if (validate()) {
             setLoading(true);
             try {
+                // Fetch prediction result
                 const response = await fetch('http://localhost:8000/predict', {
                     method: 'POST',
                     headers: {
@@ -82,26 +85,34 @@ function Prediction() {
                     },
                     body: JSON.stringify(formData),
                 });
-
+    
                 if (!response.ok) {
                     throw new Error('Server responded with an error.');
                 }
-
+    
                 const result = await response.json();
                 setPredictedPrice(result.prediction);
-                setFirstPredictionMade(true); 
-
+                setFirstPredictionMade(true);
+    
                 // Fetch the test dataset predictions
                 const scatterResponse = await fetch('http://localhost:8000/scatter-data');
                 const scatterResult = await scatterResponse.json();
-
-                 // Set Scatter Chart Data
-                 setScatterChartData({
+    
+                const chosenModelWithPrefix = `flat_model_${formData.flat_model}`;
+                const distributionResponse = await fetch(`http://localhost:8000/flat-model-distribution?chosen_model=${chosenModelWithPrefix}`);
+                const distributions = await distributionResponse.json();
+    
+                // // Fetch remaining lease distribution
+                // const leaseResponse = await fetch('http://localhost:8000/remaining-lease-distribution');
+                // const leaseData = await leaseResponse.json();
+    
+                // Scatter Chart Data
+                setScatterChartData({
                     datasets: [
                         {
                             label: "Predicted Prices (Test Data)",
                             data: scatterResult.scatter_data.map((dataPoint) => ({
-                                x: dataPoint.floor_area_sqft,  // Replace with the appropriate feature name
+                                x: dataPoint.floor_area_sqft,
                                 y: dataPoint.predicted_price,
                             })),
                             backgroundColor: "rgba(99, 132, 255, 0.5)",
@@ -115,56 +126,38 @@ function Prediction() {
                         },
                     ],
                 });
-
+    
+                // Find the index of the chosen model for highlighting
+                const chosenModelIndex = Object.keys(distributions).indexOf(chosenModelWithPrefix);
+                const highlightColor = "rgba(255, 99, 132, 1)"; // Color for highlighting
+                const defaultColors = ["rgba(75, 192, 192, 0.6)", "rgba(153, 102, 255, 0.6)", "rgba(255, 159, 64, 0.6)"];
+    
+                // Distributions Bar Chart Data
                 setBarChartData({
-                    labels: ["Predicted Price", "Floor Area (sqm)", "Price per Sqft", "Remaining Lease (months)"],
+                    labels: Object.keys(distributions), // Model names
                     datasets: [
                         {
-                            label: "Values",
-                            data: [
-                                result.prediction,
-                                parseFloat(formData.floor_area_sqm),
-                                parseFloat(formData.price_per_sqft),
-                                parseInt(formData.remaining_lease_months)
-                            ],
-                            backgroundColor: ["rgba(75, 192, 192, 0.6)", "rgba(153, 102, 255, 0.6)", "rgba(255, 159, 64, 0.6)", "rgba(255, 206, 86, 0.6)"],
+                            label: "Attribute Distributions",
+                            data: Object.values(distributions), // Use direct counts
+                            backgroundColor: Object.keys(distributions).map((_, index) =>
+                                index === chosenModelIndex ? highlightColor : defaultColors[index % defaultColors.length]
+                            ),
                         },
                     ],
                 });
-
-                setLineChartData({
-                    labels: ["-10% Floor Area", "-5% Floor Area", "Current Prediction", "+5% Floor Area", "+10% Floor Area"],
-                    datasets: [
-                        {
-                            label: "Predicted Price with Floor Area Adjustment",
-                            data: [
-                                result.prediction * 0.9,
-                                result.prediction * 0.95,
-                                result.prediction,
-                                result.prediction * 1.05,
-                                result.prediction * 1.1
-                            ],
-                            fill: false,
-                            borderColor: "rgba(75, 192, 192, 1)",
-                            tension: 0.1,
-                        },
-                    ],
-                });
-
-                setPieChartData({
-                    labels: ["Floor Area (sqm)", "Remaining Lease (months)", "Distance to CBD (m)"],
-                    datasets: [
-                        {
-                            data: [
-                                parseFloat(formData.floor_area_sqm),
-                                parseInt(formData.remaining_lease_months),
-                                parseFloat(formData.distance_to_cbd)
-                            ],
-                            backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56"],
-                        },
-                    ],
-                });
-
+    
+                // // Prepare data for the histogram
+                // setLeaseHistogramData({
+                //     labels: leaseData.lease_values,
+                //     datasets: [
+                //         {
+                //             label: "Remaining Lease Distribution",
+                //             data: leaseData.frequencies,
+                //             backgroundColor: "rgba(75, 192, 192, 0.6)",
+                //         },
+                //     ],
+                // });
+    
             } catch (error) {
                 setErrorNotification('An error occurred while fetching the prediction. Please try again.');
                 console.error('Error:', error);
@@ -175,6 +168,8 @@ function Prediction() {
             setErrorNotification("Validation failed. Please correct the highlighted fields.");
         }
     };
+    
+    
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -301,7 +296,7 @@ function Prediction() {
                     {predictedPrice !== null && !loading && (
                         <Box sx={{ marginTop: 4 }}>
                             <Typography variant="h6">Predicted Price: {formatPrice(predictedPrice)}</Typography>
-                            {barChartData && (
+                            {/* {barChartData && (
                                 <Box sx={{ marginTop: 4 }}>
                                     <Typography variant="h6">Feature Comparison</Typography>
                                     <Bar data={barChartData} options={{ responsive: true }} />
@@ -318,7 +313,7 @@ function Prediction() {
                                     <Typography variant="h6">Input Feature Proportion</Typography>
                                     <Pie data={pieChartData} options={{ responsive: true }} />
                                 </Box>
-                            )}
+                            )} */}
 
                             {/* Scatter Plot */}
                             {scatterChartData && (
@@ -327,8 +322,94 @@ function Prediction() {
                                     <Scatter data={scatterChartData} />
                                 </Box>
                             )}
+
+                            {/* Render the histogram if data is available */}
+                            {barChartData && (
+                                <div style={{ marginTop: '20px' }}>
+                                    <Typography variant="h6">Attribute Distributions</Typography>
+                                    <Bar
+                                        data={barChartData}
+                                        options={{
+                                            responsive: true,
+                                            plugins: {
+                                                legend: {
+                                                    position: 'top',
+                                                },
+                                                title: {
+                                                    display: true,
+                                                    text: 'Distribution of Various Attributes',
+                                                },
+                                            },
+                                            scales: {
+                                                x: {
+                                                    title: {
+                                                        display: true,
+                                                        text: 'Attributes',
+                                                    },
+                                                },
+                                                y: {
+                                                    title: {
+                                                        display: true,
+                                                        text: 'Frequency',
+                                                    },
+                                                    beginAtZero: true,
+                                                },
+                                            },
+                                        }}
+                                    />
+                                </div>
+                            )}
+                            
+                            {/* Render the histogram if data is available
+                            {leaseHistogramData && (
+                                <div style={{ marginTop: '20px' }}>
+                                    <Typography variant="h6">Remaining Lease Distribution Histogram</Typography>
+                                    <Bar
+                                        data={{
+                                            labels: leaseHistogramData.labels, // Lease range labels
+                                            datasets: [
+                                                {
+                                                    label: "Remaining Lease Counts",
+                                                    data: leaseHistogramData.datasets[0].data, // Frequencies
+                                                    backgroundColor: "rgba(75, 192, 192, 0.6)",
+                                                },
+                                            ],
+                                        }}
+                                        options={{
+                                            responsive: true,
+                                            plugins: {
+                                                legend: {
+                                                    position: 'top',
+                                                },
+                                                title: {
+                                                    display: true,
+                                                    text: 'Distribution of Remaining Lease',
+                                                },
+                                            },
+                                            scales: {
+                                                x: {
+                                                    title: {
+                                                        display: true,
+                                                        text: 'Remaining Lease (Months)',
+                                                    },
+                                                },
+                                                y: {
+                                                    title: {
+                                                        display: true,
+                                                        text: 'Frequency',
+                                                    },
+                                                    beginAtZero: true,
+                                                },
+                                            },
+                                        }}
+                                    />
+                                </div>
+                            )} */}
                         </Box>
                     )}
+
+                
+        
 
                     <Snackbar open={!!errorNotification} autoHideDuration={6000} onClose={() => setErrorNotification(null)}>
                         <Alert onClose={() => setErrorNotification(null)} severity="error" sx={{ width: '100%' }}>
