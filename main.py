@@ -3,19 +3,20 @@ import pickle
 import pandas as pd
 import os
 from datetime import datetime
-from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi import FastAPI, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import Column, Integer, String, create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Float
 from sqlalchemy.orm import sessionmaker, Session
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional, List
-
+from typing import Optional
+from typing import List
 
 # Database Configuration
-DATABASE_URL = "mysql://root:Nick*2004@localhost:3306"
+DATABASE_URL = "mysql://root:G1briel1234@localhost:3306"
 DATABASE_NAME = "user"
 
 # Initial engine for database creation
@@ -167,7 +168,29 @@ def predict_test_data():
     for i, col in enumerate(numerical_columns):
         scaled_df[col] = unscaled_values[:, i]
 
-    return scaled_df[['floor_area_sqft', 'predicted_price', 'remaining_lease_months', 'price_per_sqft', 'distance_to_mrt_meters', 'distance_to_cbd', 'distance_to_pri_school_meters']]  # Columns for scatter plot and bar chart
+    return scaled_df[['floor_area_sqft', 'predicted_price']]  # Columns for scatter plot
+
+class PredictionHistory(Base):
+    __tablename__ = "prediction_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer)
+    date_listed = Column(String(255))  # Specify a length, e.g., 255
+    floor_area_sqm = Column(Float)
+    remaining_lease_months = Column(Integer)
+    floor_area_sqft = Column(Float)
+    price_per_sqft = Column(Float)
+    distance_to_mrt_meters = Column(Float)
+    distance_to_cbd = Column(Float)
+    distance_to_pri_school_meters = Column(Float)
+    flat_type = Column(String(100))  # Specify a length, e.g., 100
+    storey_range = Column(String(100))  # Specify a length, e.g., 100
+    flat_model = Column(String(100))  # Specify a length, e.g., 100
+    region_ura = Column(String(100))  # Specify a length, e.g., 100
+    transport_type = Column(String(100))  # Specify a length, e.g., 100
+    line_color = Column(String(100))  # Specify a length, e.g., 100
+    predicted_price = Column(Float)
+
 
 
 class HouseData(BaseModel):
@@ -185,6 +208,28 @@ class HouseData(BaseModel):
     region_ura: str
     transport_type: str
     line_color: str
+
+# Pydantic model for history
+class PredictionHistoryCreate(BaseModel):
+    date_listed: str
+    floor_area_sqm: float
+    remaining_lease_months: int
+    floor_area_sqft: float
+    price_per_sqft: float
+    distance_to_mrt_meters: float
+    distance_to_cbd: float
+    distance_to_pri_school_meters: float
+    flat_type: str
+    storey_range: str
+    flat_model: str
+    region_ura: str
+    transport_type: str
+    line_color: str
+    predicted_price: float
+
+# Create the history table
+Base.metadata.create_all(bind=engine)
+
 
 def preprocess_input(data: dict):
     # Convert 'date_listed' to Unix timestamp
@@ -266,6 +311,39 @@ def update_profile(updated_user: UserUpdate, user: User = Depends(get_current_us
 
     return {"msg": "Profile updated successfully"}
 
+# Route to save prediction history
+@app.post("/save-history")
+def save_history(
+    history: PredictionHistoryCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    new_history = PredictionHistory(
+        user_id=user.id,
+        date_listed=history.date_listed,
+        floor_area_sqm=history.floor_area_sqm,
+        remaining_lease_months=history.remaining_lease_months,
+        floor_area_sqft=history.floor_area_sqft,
+        price_per_sqft=history.price_per_sqft,
+        distance_to_mrt_meters=history.distance_to_mrt_meters,
+        distance_to_cbd=history.distance_to_cbd,
+        distance_to_pri_school_meters=history.distance_to_pri_school_meters,
+        flat_type=history.flat_type,
+        storey_range=history.storey_range,
+        flat_model=history.flat_model,
+        region_ura=history.region_ura,
+        transport_type=history.transport_type,
+        line_color=history.line_color,
+        predicted_price=history.predicted_price
+    )
+    db.add(new_history)
+    db.commit()
+    return {"msg": "History saved successfully"}
+
+# Route to get prediction history
+@app.get("/get-history", response_model=List[PredictionHistoryCreate])
+def get_history(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    history = db.query(PredictionHistory).filter(PredictionHistory.user_id == user.id).all()
+    return history
+
 @app.post("/predict")
 def predict(house: HouseData):
     # Prepare input data for prediction
@@ -284,47 +362,7 @@ def scatter_data():
         "scatter_data": test_predictions.to_dict(orient="records")
     }
 
-@app.get("/flat-model-distribution")
-def get_flat_model_distribution(chosen_model: str = Query(None)):
-    # Get counts of each flat model based on one-hot encoded columns
-    distribution = test_data.filter(like='flat_model_').sum().to_dict()
-    
-    print("Initial distribution:", distribution)
-    print("Chosen model:", chosen_model)
 
-    # If a model is chosen, increment its count for highlighting
-    if chosen_model in distribution:
-        distribution[chosen_model] += 1  # Increment the count for the chosen model
-        print(f"Incremented count for {chosen_model}: {distribution[chosen_model]}")
-
-    return distribution
-
-@app.get("/remaining-lease-distribution")
-def get_remaining_lease_distribution(user_lease: int = Query(None)) -> dict:
-    # Fetch unscaled test data with unscaled remaining_lease_months
-    unscaled_test_data = predict_test_data()
-    
-    # Calculate the distribution using unscaled remaining lease months
-    distribution = unscaled_test_data['remaining_lease_months'].value_counts().sort_index().to_dict()
-
-    # Separate keys and values into two lists
-    lease_values = list(distribution.keys())
-    frequencies = list(distribution.values())
-
-    # Update distribution with user's input
-    if user_lease is not None:
-        if user_lease in distribution:
-            distribution[user_lease] += 1  # Increment the count
-        else:
-            distribution[user_lease] = 1  # Add new entry with count 1
-        # Sort again to maintain order
-        distribution = dict(sorted(distribution.items()))
-
-    # Prepare data for return
-    lease_values = list(distribution.keys())
-    frequencies = list(distribution.values())
-
-    return {"lease_values": lease_values, "frequencies": frequencies}
 
 if __name__ == "__main__":
     import uvicorn
