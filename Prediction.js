@@ -4,6 +4,8 @@ import {
 } from '@mui/material';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, ArcElement, PointElement, Tooltip, Legend, Title } from 'chart.js';
 import { Bar, Line, Pie, Scatter } from 'react-chartjs-2';
+import { keyframes } from '@mui/system';
+import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid'; 
 import './index.css';
 
 // Register Chart.js components, including PointElement
@@ -36,6 +38,40 @@ function Prediction() {
     const [loading, setLoading] = useState(false); // Loading state
     const [errorNotification, setErrorNotification] = useState(null); // Error notification state
     const [firstPredictionMade, setFirstPredictionMade] = useState(false); 
+    const [showLandscapePrompt, setShowLandscapePrompt] = useState(false); // New state for landscape prompt
+
+    const rotatePhone = keyframes`
+        0%, 100% {
+            transform: rotate(0deg);
+        }
+        50% {
+            transform: rotate(90deg);
+        }
+        `;
+    // Function to check if the device is in portrait mode
+    const checkOrientation = () => {
+        const isPortrait = window.innerHeight > window.innerWidth;
+        const isSmallScreen = window.innerWidth < 768;
+        if (isPortrait && isSmallScreen) {
+            setShowLandscapePrompt(true);
+            // Hide the prompt after 5 seconds
+            setTimeout(() => {
+                setShowLandscapePrompt(false);
+            }, 5000);
+        } else {
+            setShowLandscapePrompt(false);
+        }
+    };
+
+    // Add event listener for orientation changes
+    useEffect(() => {
+        checkOrientation(); // Check orientation on component mount
+        window.addEventListener('resize', checkOrientation);
+        return () => {
+            window.removeEventListener('resize', checkOrientation);
+        };
+    }, []);
+
 
     const regexPatterns = {
         floor_area_sqm: /^\d+(\.\d{1,2})?$/,           // Allows integers or decimal up to 2 places
@@ -205,7 +241,35 @@ function Prediction() {
 
 
     return(
-        <Grid container sx = {{minHeight: '100vh', bgcolor: '#e5ffcc'}}>
+        <Grid container sx={{ minHeight: '100vh', bgcolor: '#e5ffcc' }}>
+            {showLandscapePrompt && (
+                <Box
+                    sx={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        bgcolor: 'rgba(0, 0, 0, 0.7)',
+                        color: 'white',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 1000,
+                    }}
+                >
+                    <PhoneAndroidIcon
+                    sx={{
+                        fontSize: 60,
+                        mb: 2,
+                        animation: `${rotatePhone} 2s infinite`, // Use the animation
+                    }}
+                />
+                    <Typography variant="h6" align="center">
+                        For a better experience, please switch to landscape mode.
+                    </Typography>
+                </Box>
+            )}
             <Card sx={{ width: '80%', margin: 'auto', marginTop: 4, padding: 2, borderRadius: '16px', background: 'linear-gradient(to right, #c3f0a2, #aef4c9)' }}>
                 <CardContent>
                     <Typography variant="h5" sx={{ marginBottom: 2 }}>Housing Details Form</Typography>
@@ -341,8 +405,16 @@ function Prediction() {
                         </Box>
                     )}
 
-                    <Snackbar open={!!errorNotification} autoHideDuration={6000} onClose={() => setErrorNotification(null)}>
-                        <Alert onClose={() => setErrorNotification(null)} severity="error" sx={{ width: '100%' }}>
+                    <Snackbar
+                        open={!!errorNotification}
+                        autoHideDuration={6000}
+                        onClose={() => setErrorNotification(null)}
+                    >
+                        <Alert
+                            onClose={() => setErrorNotification(null)}
+                            severity="error"
+                            sx={{ width: '100%' }}
+                        >
                             {errorNotification}
                         </Alert>
                     </Snackbar>
@@ -351,5 +423,6 @@ function Prediction() {
         </Grid>
     );
 }
+
 
 export default Prediction;
