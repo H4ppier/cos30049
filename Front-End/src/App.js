@@ -155,15 +155,15 @@ function App() {
             Follow Us
           </Typography>
           <Box>
-            <Link href="https://facebook.com" color="inherit">
+            <a href="https://facebook.com" color="inherit" target="_blank" rel="noopener noreferrer">
               <FacebookIcon sx={{ fontSize: 30, mr: 1, color: 'black' }} />
-            </Link>
-            <Link href="https://twitter.com" color="inherit">
+            </a>
+            <a href="https://twitter.com" color="inherit" target="_blank" rel="noopener noreferrer">
               <TwitterIcon sx={{ fontSize: 30, mr: 1, color: 'black' }} />
-            </Link>
-            <Link href="https://instagram.com" color="inherit">
+            </a>
+            <a href="https://instagram.com" color="inherit" target="_blank" rel="noopener noreferrer">
               <InstagramIcon sx={{ fontSize: 30, color: 'black' }} />
-            </Link>
+            </a>
           </Box>
         </Grid>
       </Grid>
