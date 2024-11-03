@@ -27,8 +27,8 @@ function RegisterPage() {
     } else if (name === 'password') {
       if (!value) {
         error = 'Password is required';
-      } else if (value.length < 6) {
-        error = 'Password must be at least 6 characters long';
+      } else if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/.test(value)) {
+        error = 'Password must be minimum eight characters, at least one letter, one number and one special character';
       }
     } else if (name === 'confirmPassword') {
       if (!value) {

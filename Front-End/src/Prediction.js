@@ -31,8 +31,6 @@ function Prediction() {
     const [predictedPrice, setPredictedPrice] = useState(null);
     const [barChartData, setBarChartData] = useState(null);
     const [leaseHistogramData, setLeaseHistogramData] = useState(null);
-    const [lineChartData, setLineChartData] = useState(null);
-    const [pieChartData, setPieChartData] = useState(null);
     const [scatterChartData, setScatterChartData] = useState(null);  // Scatter plot data
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false); // Loading state
@@ -136,7 +134,6 @@ function Prediction() {
     
                 // Find the index of the chosen model for highlighting
                 const chosenModelIndex = Object.keys(distributions).indexOf(chosenModelWithPrefix);
-                const highlightColor = "rgba(255, 99, 132, 1)"; // Color for highlighting
                 const defaultColors = ["rgba(75, 192, 192, 0.6)", "rgba(153, 102, 255, 0.6)", "rgba(255, 159, 64, 0.6)"];
     
                 // Distributions Bar Chart Data
