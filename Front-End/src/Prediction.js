@@ -5,6 +5,8 @@ import { Bar, Scatter } from 'react-chartjs-2';
 import { Chart, registerables } from 'chart.js';
 import './index.css';
 import zoomPlugin from 'chartjs-plugin-zoom';
+import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid'; 
+import { keyframes } from '@mui/system';
 
 Chart.register(...registerables, zoomPlugin);
 // Register Chart.js components, including PointElement
@@ -28,6 +30,8 @@ function Prediction() {
         line_color: ''
     });
 
+
+
     const [predictedPrice, setPredictedPrice] = useState(null);
     const [barChartData, setBarChartData] = useState(null);
     const [leaseHistogramData, setLeaseHistogramData] = useState(null);
@@ -36,6 +40,31 @@ function Prediction() {
     const [loading, setLoading] = useState(false); // Loading state
     const [errorNotification, setErrorNotification] = useState(null); // Error notification state
     const [firstPredictionMade, setFirstPredictionMade] = useState(false); 
+    const [showLandscapePrompt, setShowLandscapePrompt] = useState(false);
+
+    const rotatePhone = keyframes`
+    0%, 100% {
+        transform: rotate(0deg);
+    }
+    50% {
+        transform: rotate(90deg);
+    }
+    `;
+
+        // Function to check if the device is in portrait mode
+        const checkOrientation = () => {
+            const isPortrait = window.innerHeight > window.innerWidth;
+            const isSmallScreen = window.innerWidth < 768;
+            if (isPortrait && isSmallScreen) {
+                setShowLandscapePrompt(true);
+                // Hide the prompt after 5 seconds
+                setTimeout(() => {
+                    setShowLandscapePrompt(false);
+                }, 5000);
+            } else {
+                setShowLandscapePrompt(false);
+            }
+        };
 
     const regexPatterns = {
         floor_area_sqm: /^\d+(\.\d{1,2})?$/,           // Allows integers or decimal up to 2 places
@@ -68,6 +97,15 @@ function Prediction() {
         setErrors(newErrors);
         return valid;
     };
+
+        // Add event listener for orientation changes
+        useEffect(() => {
+            checkOrientation(); // Check orientation on component mount
+            window.addEventListener('resize', checkOrientation);
+            return () => {
+                window.removeEventListener('resize', checkOrientation);
+            };
+        }, []);
 
     const fetchPrediction = async () => {
         if (validate()) {
@@ -211,6 +249,34 @@ function Prediction() {
 
     return(
         <Grid container sx = {{minHeight: '100vh', bgcolor: '#e5ffcc'}}>
+            {showLandscapePrompt && (
+                <Box
+                    sx={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        bgcolor: 'rgba(0, 0, 0, 0.7)',
+                        color: 'white',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 1000,
+                    }}
+                >
+                    <PhoneAndroidIcon
+                    sx={{
+                        fontSize: 60,
+                        mb: 2,
+                        animation: `${rotatePhone} 2s infinite`, // Use the animation
+                    }}
+                />
+                    <Typography variant="h6" align="center">
+                        For a better experience, please switch to landscape mode.
+                    </Typography>
+                </Box>
+            )}
             <Card sx={{ width: '80%', margin: 'auto', marginTop: 4, padding: 2, borderRadius: '16px', background: 'linear-gradient(to right, #c3f0a2, #aef4c9)' }}>
                 <CardContent>
                     <Typography variant="h5" sx={{ marginBottom: 2 }}>Housing Details Form</Typography>
