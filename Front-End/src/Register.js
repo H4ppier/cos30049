@@ -114,7 +114,7 @@ function RegisterPage() {
                 <TextField margin="normal" required fullWidth name="password" label="Password" type="password" id="password" autoComplete="new-password" value={formData.password} onChange={handleChange} error={Boolean(errors.password)} helperText={errors.password} />
                 <TextField margin="normal" required fullWidth name="confirmPassword" label="Confirm Password" type="password" id="confirmPassword" autoComplete="new-password" value={formData.confirmPassword} onChange={handleChange} error={Boolean(errors.confirmPassword)} helperText={errors.confirmPassword}/>
                 <Button type="submit" fullWidth variant="contained" sx={{ mt: 1, mb: 2, backgroundColor: 'teal', color: 'white', borderRadius: '20px' }}>
-                  Sign Up
+                  Register
                 </Button>
               </Box>
             </Paper>

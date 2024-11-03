@@ -89,7 +89,7 @@ function Login({ setIsAuthenticated }){
                 <Grid container justifyContent="center">
                   <Typography variant="body2" sx={{ mr: 1 }}>Don't have an account?</Typography>
                   <Link to="/register" style={{ textDecoration: 'none', color: 'teal' }}>
-                    Sign Up
+                    Register Here
                   </Link>
                 </Grid>
               </Box>
