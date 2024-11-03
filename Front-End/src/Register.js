@@ -76,9 +76,12 @@ function RegisterPage() {
       navigate('/Login'); // Redirect to login after successful signup
     } catch (error) {
       if (error.response && error.response.status === 400) {
-        setErrors((prevErrors) => ({
-          ...prevErrors,
-          username: 'Username already taken',
+        const errorMessage = error.response.data.detail; // Get the specific error message
+      // Set errors based on the message from the server
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        username: errorMessage.includes("Username") ? errorMessage : prevErrors.username,
+        email: errorMessage.includes("Email") ? errorMessage : prevErrors.email,
         }));
       } else {
         console.error('Signup error:', error);

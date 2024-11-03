@@ -57,6 +57,11 @@ function Profile() {
     setErrors({ ...errors, [name]: '' }); // Clear error on change
   };
 
+  const validateEmail = (email) => {
+    const validate = /\S+@\S+\.\S+/; // Simple regex for basic email validation
+    return validate.test(String(email).toLowerCase());
+  };
+
   const handleSave = async () => {
     // Basic validation
     const newErrors = {};
@@ -65,7 +70,10 @@ function Profile() {
     }
     if (!user.email) {
       newErrors.email = 'Email is required';
+    }else if (!validateEmail(user.email)) {  // Add email format validation
+      newErrors.email = 'Invalid email format';
     }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
