@@ -107,7 +107,10 @@ def authenticate_user(db: Session, username: str, password: str):
 def signup(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
+        raise HTTPException(status_code=400, detail="Username already been registered")
+    db_email = db.query(User).filter(User.email == user.email).first()
+    if db_email:
+        raise HTTPException(status_code=400, detail="Email already been registered")
     create_user(db, user.username, user.email, user.password)
     return {"msg": "User created successfully"}
 
